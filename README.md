@@ -5,27 +5,19 @@ Mẫu code này giúp bạn train và dự đoán cho bộ dữ liệu:
 
 ## 1) Chuẩn bị dữ liệu
 
-Sau khi add dataset vào Kaggle Notebook, bạn có thể dùng:
-
-```python
-import os
-for dirname, _, filenames in os.walk('/kaggle/input'):
-    for filename in filenames:
-        print(os.path.join(dirname, filename))
-```
-
-Mục tiêu là tìm được thư mục có cấu trúc `ImageFolder` (ví dụ):
+Sau khi tải dữ liệu từ Kaggle, đặt dữ liệu theo cấu trúc `ImageFolder`:
 
 ```text
-/kaggle/input/<ten-dataset>/train/
-  class_1/
-    img1.jpg
-    ...
-  class_2/
-    ...
+dataset/
+  train/
+    class_1/
+      img1.jpg
+      ...
+    class_2/
+      ...
 ```
 
-> Script `train_butterfly.py` đã hỗ trợ `--data_dir auto` để tự dò đường dẫn phổ biến trong Kaggle.
+> `train_butterfly.py` mặc định đọc từ `dataset/train`.
 
 ## 2) Cài thư viện
 
@@ -35,31 +27,22 @@ pip install -r requirements.txt
 
 ## 3) Train model
 
-### Cách 1: auto-detect trong Kaggle
 ```bash
-python train_butterfly.py --data_dir auto --epochs 10 --batch_size 32 --output_dir /kaggle/working/checkpoints
+python train_butterfly.py --data_dir dataset/train --epochs 10 --batch_size 32
 ```
 
-### Cách 2: chỉ định thủ công đường dẫn vừa tìm được
-```bash
-python train_butterfly.py --data_dir /kaggle/input/<ten-dataset>/train --epochs 10 --batch_size 32 --output_dir /kaggle/working/checkpoints
-```
-
-Các file sẽ được lưu trong `output_dir`:
+Các file sẽ được lưu trong `checkpoints/`:
 - `resnet18_butterfly.pth`
 - `labels.json`
 
 ## 4) Dự đoán ảnh mới
 
 ```bash
-python predict.py \
-  --image /kaggle/input/<ten-dataset>/test/some_image.jpg \
-  --checkpoint /kaggle/working/checkpoints/resnet18_butterfly.pth \
-  --labels /kaggle/working/checkpoints/labels.json
+python predict.py --image path/to/new_image.jpg
 ```
 
 Ví dụ fine-tune toàn bộ backbone:
 
 ```bash
-python train_butterfly.py --data_dir auto --epochs 12 --unfreeze --lr 1e-4
+python train_butterfly.py --data_dir dataset/train --epochs 12 --unfreeze --lr 1e-4
 ```

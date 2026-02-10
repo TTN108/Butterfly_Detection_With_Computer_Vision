@@ -25,51 +25,6 @@ def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def is_imagefolder_dir(path: Path) -> bool:
-    if not path.exists() or not path.is_dir():
-        return False
-
-    class_dirs = [p for p in path.iterdir() if p.is_dir()]
-    if not class_dirs:
-        return False
-
-    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    for class_dir in class_dirs:
-        for f in class_dir.iterdir():
-            if f.is_file() and f.suffix.lower() in exts:
-                return True
-    return False
-
-
-def resolve_data_dir(data_dir_arg: str) -> str:
-    if data_dir_arg != "auto":
-        data_path = Path(data_dir_arg)
-        if not data_path.exists():
-            raise FileNotFoundError(f"Data directory not found: {data_dir_arg}")
-        return str(data_path)
-
-    candidates = [
-        Path("dataset/train"),
-        Path("/kaggle/input/butterfly-image-classification/train"),
-    ]
-
-    kaggle_input = Path("/kaggle/input")
-    if kaggle_input.exists():
-        for ds_dir in kaggle_input.iterdir():
-            if ds_dir.is_dir():
-                candidates.append(ds_dir / "train")
-
-    for cand in candidates:
-        if is_imagefolder_dir(cand):
-            print(f"[INFO] Auto-detected data_dir: {cand}")
-            return str(cand)
-
-    raise FileNotFoundError(
-        "Cannot auto-detect ImageFolder data directory. "
-        "Please set --data_dir explicitly (example: /kaggle/input/<dataset-name>/train)."
-    )
-
-
 def build_datasets(data_dir: str, image_size: int, val_split: float) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     train_transform = transforms.Compose(
         [
@@ -171,7 +126,7 @@ def save_checkpoint(model, class_to_idx, output_dir: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Train butterfly image classification model")
-    parser.add_argument("--data_dir", type=str, default="auto", help='Path to ImageFolder dataset (or "auto")')
+    parser.add_argument("--data_dir", type=str, default="dataset/train", help="Path to ImageFolder dataset")
     parser.add_argument("--output_dir", type=str, default="checkpoints")
     parser.add_argument("--image_size", type=int, default=224)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -179,19 +134,19 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--val_split", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--num_workers", type=int, default=2)
     parser.add_argument("--unfreeze", action="store_true", help="Fine-tune whole backbone")
     args = parser.parse_args()
 
-    data_dir = resolve_data_dir(args.data_dir)
+    if not os.path.exists(args.data_dir):
+        raise FileNotFoundError(f"Data directory not found: {args.data_dir}")
 
     set_seed(args.seed)
     device = get_device()
 
-    train_dataset, val_dataset = build_datasets(data_dir, args.image_size, args.val_split)
+    train_dataset, val_dataset = build_datasets(args.data_dir, args.image_size, args.val_split)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
     num_classes = len(train_dataset.dataset.classes)
     model = build_model(num_classes, freeze_backbone=not args.unfreeze).to(device)
